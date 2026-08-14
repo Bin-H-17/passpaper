@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "passpaper-mcp"
+version = "1.0.0"
+description = "递纸 PassPaper — Let AI agents read your tablet handwriting in real time"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "B.Han"}]
+keywords = ["mcp", "handwriting", "tablet", "claude-code", "codex", "math"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics",
+]
+dependencies = [
+    "websockets>=13.0",
+    "Pillow>=10.0",
+    "qrcode>=7.0",
+]
+
+[project.scripts]
+passpaper = "passpaper.cli:main"
+passpaper-daemon = "passpaper.daemon:main"
+passpaper-mcp = "passpaper.mcp_shim:main"
+
+[project.urls]
+Homepage = "https://github.com/passpaper-community/passpaper"
+Repository = "https://github.com/passpaper-community/passpaper"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+passpaper = ["canvas.html"]

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "passpaper": {
+      "command": "python",
+      "args": ["-m", "passpaper.mcp_shim"],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>递纸 · PassPaper</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  #app { width: 100%; height: 100%; display: flex; flex-direction: column; }
+
+  #canvas-area {
+    flex: 1; overflow: hidden;
+    position: relative; background: #fff;
+  }
+
+  svg#drawing {
+    width: 100%; height: 100%; display: block;
+  }
+
+  #toolbar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px; padding: 12px 20px;
+    background: #fafafa; border-top: 1px solid #e0e0e0;
+    min-height: 56px;
+  }
+
+  .color-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid transparent; cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .color-dot:active { transform: scale(0.9); }
+  .color-dot.active { border-color: #888; }
+
+  .tool-btn {
+    padding: 6px 16px; border-radius: 16px;
+    border: 1px solid #ccc; background: #fff;
+    font-size: 14px; cursor: pointer;
+    transition: background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tool-btn:active { background: #eee; }
+  .tool-btn.active { background: #333; color: #fff; border-color: #333; }
+
+  #status {
+    position: fixed; top: 12px; right: 12px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #999; pointer-events: none;
+  }
+  #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+  #status-dot.connected { background: #4caf50; }
+  #status-dot.connecting { background: #ffc107; }
+  #status-dot.disconnected { background: #f44336; }
+
+  #queue-badge {
+    position: fixed; top: 12px; left: 12px;
+    font-size: 12px; color: #b26a00; background: #fff6e0;
+    border: 1px solid #ffd98a; border-radius: 10px;
+    padding: 3px 10px; display: none; pointer-events: none;
+  }
+
+  /* Eraser cursor circle */
+  #eraser-cursor {
+    position: fixed; pointer-events: none; z-index: 999;
+    border-radius: 50%; border: 2px dashed #999;
+    background: rgba(200,200,200,0.15);
+    display: none; transform: translate(-50%, -50%);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvas-area">
+    <svg id="drawing"><g id="layer"></g></svg>
+  </div>
+  <div id="toolbar">
+    <button class="color-dot active" data-color="#000000" style="background:#000"></button>
+    <button class="color-dot" data-color="#e53935" style="background:#e53935"></button>
+    <button class="color-dot" data-color="#1e88e5" style="background:#1e88e5"></button>
+    <button class="tool-btn" id="eraser-btn">橡皮擦</button>
+    <button class="tool-btn" id="clear-btn">清空</button>
+    <button class="tool-btn" id="session-btn">保存会话</button>
+    <button class="tool-btn" id="newsession-btn">新建会话</button>
+  </div>
+</div>
+<div id="status">
+  <div id="status-dot" class="disconnected"></div>
+  <span id="status-text">未连接</span>
+</div>
+<div id="queue-badge"></div>
+<div id="eraser-cursor"></div>
+
+<script type="module">
+import { getStroke } from 'https://esm.sh/perfect-freehand@1.2.2';
+
+// Canonical coordinate space shared with the server.
+// Client maps its visual viewport into this space (uniform scale, letterboxed),
+// so what you see on the tablet is exactly what the AI gets — regardless of
+// device orientation, screen size, or pinch-zoom.
+const CW = 2048, CH = 1536;
+
+const state = {
+  color: '#000000',
+  eraser: false,
+  ws: null,
+  reconnectTimer: null,
+  reconnectDelay: 1000,
+  zoom: { scale: 1, ox: 0, oy: 0 },
+  currentStroke: null,
+  connected: false,
+};
+
+const svg = document.getElementById('drawing');
+const layer = document.getElementById('layer');
+const canvasArea = document.getElementById('canvas-area');
+const statusDot = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const queueBadge = document.getElementById('queue-badge');
+const eraserBtn = document.getElementById('eraser-btn');
+const clearBtn = document.getElementById('clear-btn');
+const colorDots = document.querySelectorAll('.color-dot');
+const eraserCursor = document.getElementById('eraser-cursor');
+
+const ERASER_SIZE = 24;
+eraserCursor.style.width = ERASER_SIZE + 'px';
+eraserCursor.style.height = ERASER_SIZE + 'px';
+
+// ── 缩放变换（只影响本地显示，不影响发给服务器的坐标）──
+function applyZoom() {
+  layer.setAttribute('transform',
+    `translate(${state.zoom.ox} ${state.zoom.oy}) scale(${state.zoom.scale})`);
+}
+
+// screenX/Y → layer 内部用户坐标（本地 SVG 渲染用）
+function screenToLayer(screenX, screenY) {
+  return {
+    x: (screenX - state.zoom.ox) / state.zoom.scale,
+    y: (screenY - state.zoom.oy) / state.zoom.scale,
+  };
+}
+
+// screenX/Y（相对 svg 的 CSS 像素）→ canonical 2048×1536 坐标（发给服务器用）
+function screenToCanonical(screenX, screenY, rect) {
+  const s = Math.min(CW / rect.width, CH / rect.height);
+  const ox = (CW - rect.width * s) / 2;
+  const oy = (CH - rect.height * s) / 2;
+  return { x: screenX * s + ox, y: screenY * s + oy };
+}
+
+function canonicalScale(rect) {
+  return Math.min(CW / rect.width, CH / rect.height);
+}
+
+// ── 离线队列（localStorage 持久化）──
+const QUEUE_KEY = 'pp_queue_v1';
+
+function loadQueue() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
+  catch (_) { return []; }
+}
+
+function saveQueue(q) {
+  try {
+    if (q.length) localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    else localStorage.removeItem(QUEUE_KEY);
+  } catch (_) {}
+  updateQueueBadge(q.length);
+}
+
+function enqueue(strokeMsg) {
+  const q = loadQueue();
+  q.push(strokeMsg);
+  saveQueue(q);
+}
+
+function updateQueueBadge(n) {
+  if (n > 0) {
+    queueBadge.textContent = `离线缓存 ${n} 笔，重连后自动同步`;
+    queueBadge.style.display = 'block';
+  } else {
+    queueBadge.style.display = 'none';
+  }
+}
+
+function flushQueue() {
+  const q = loadQueue();
+  if (!q.length || !state.connected) return;
+  // 分块补发，避免单条消息过大
+  const CHUNK = 25;
+  for (let i = 0; i < q.length; i += CHUNK) {
+    const chunk = q.slice(i, i + CHUNK);
+    if (chunk.length === 1) rawSend(chunk[0]);
+    else rawSend({ action: 'batch', strokes: chunk });
+  }
+  saveQueue([]);
+}
+
+// ── WebSocket ──
+const PASSPAPER_TOKEN = '__SESSION_TOKEN__';
+const PASSPAPER_PORT = '__WS_PORT__';
+
+function connectWS() {
+  if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) return;
+  setStatus('connecting');
+  const token = PASSPAPER_TOKEN.startsWith('__') ? null : PASSPAPER_TOKEN;
+  const port = PASSPAPER_PORT.startsWith('__') ? '8765' : PASSPAPER_PORT;
+  const tokenParam = token ? `?token=${token}` : '';
+  const ws = new WebSocket(`ws://${location.hostname}:${port}/${tokenParam}`);
+  state.ws = ws;
+
+  ws.onopen = () => {
+    state.connected = true;
+    setStatus('connected');
+    state.reconnectDelay = 1000;
+    const rect = svg.getBoundingClientRect();
+    rawSend({
+      action: 'hello',
+      viewport: { w: Math.round(rect.width), h: Math.round(rect.height) },
+      orientation: (screen.orientation && screen.orientation.angle) || 0,
+    });
+    flushQueue();
+  };
+
+  ws.onclose = () => {
+    state.connected = false;
+    setStatus('disconnected');
+    scheduleReconnect();
+  };
+
+  ws.onerror = () => { try { ws.close(); } catch (_) {} };
+}
+
+function scheduleReconnect() {
+  if (state.reconnectTimer) return;
+  state.reconnectTimer = setTimeout(() => {
+    state.reconnectTimer = null;
+    state.reconnectDelay = Math.min(state.reconnectDelay * 1.5, 15000);
+    connectWS();
+  }, state.reconnectDelay);
+}
+
+function rawSend(msg) {
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+    state.ws.send(JSON.stringify(msg));
+    return true;
+  }
+  return false;
+}
+
+// 业务发送：连不上就进离线队列（写的内容永远不丢）
+function sendStroke(msg) {
+  if (!rawSend(msg)) enqueue(msg);
+}
+
+function setStatus(s) {
+  statusDot.className = s;
+  const labels = { connected: '已连接', connecting: '连接中…', disconnected: '离线（可继续书写）' };
+  statusText.textContent = labels[s] || s;
+}
+
+// 心跳：保持 NAT/浏览器后台连接不断
+setInterval(() => {
+  if (state.connected) rawSend({ action: 'ping' });
+}, 25000);
+
+// 回到前台时立即尝试重连
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !state.connected) connectWS();
+});
+
+// ── 颜色 / 工具 ──
+colorDots.forEach(dot => {
+  dot.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    state.color = dot.dataset.color;
+    state.eraser = false;
+    colorDots.forEach(d => d.classList.remove('active'));
+    dot.classList.add('active');
+    eraserBtn.classList.remove('active');
+    eraserCursor.style.display = 'none';
+  });
+});
+
+eraserBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  state.eraser = !state.eraser;
+  eraserBtn.classList.toggle('active', state.eraser);
+  eraserCursor.style.display = state.eraser ? 'block' : 'none';
+  if (state.eraser) {
+    colorDots.forEach(d => d.classList.remove('active'));
+  } else {
+    colorDots[0].classList.add('active');
+    state.color = '#000000';
+  }
+});
+
+clearBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  layer.innerHTML = '';
+  saveQueue([]);           // 清空时丢弃未同步的队列，与服务器状态一致
+  rawSend({ action: 'clear' });
+});
+
+// ── 绘图 ──
+let activePointerId = null;
+
+canvasArea.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch' && !e.isPrimary) return;
+
+  activePointerId = e.pointerId;
+  svg.setPointerCapture(e.pointerId);
+
+  const rect = svg.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const pt = screenToLayer(sx, sy);
+  state.currentStroke = {
+    points: [{ x: pt.x, y: pt.y, sx, sy, pressure: e.pressure || 0.5 }],
+    color: state.eraser ? '#ffffff' : state.color,
+    width: state.eraser ? ERASER_SIZE : 3,
+    eraser: state.eraser,
+  };
+});
+
+canvasArea.addEventListener('pointermove', (e) => {
+  if (state.eraser) {
+    eraserCursor.style.left = e.clientX + 'px';
+    eraserCursor.style.top = e.clientY + 'px';
+  }
+
+  if (e.pointerId !== activePointerId || !state.currentStroke) return;
+  e.preventDefault();
+
+  const rect = svg.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const pt = screenToLayer(sx, sy);
+  state.currentStroke.points.push({ x: pt.x, y: pt.y, sx, sy, pressure: e.pressure || 0.5 });
+});
+
+canvasArea.addEventListener('pointerup', (e) => {
+  if (e.pointerId !== activePointerId) return;
+  try { svg.releasePointerCapture(e.pointerId); } catch (_) {}
+  activePointerId = null;
+  finishStroke();
+});
+
+canvasArea.addEventListener('pointercancel', () => {
+  activePointerId = null;
+  state.currentStroke = null;
+});
+
+function finishStroke() {
+  const s = state.currentStroke;
+  if (!s || s.points.length < 2) { state.currentStroke = null; return; }
+
+  // 本地显示（layer 坐标 + perfect-freehand 平滑）
+  const pts = s.points.map(p => [p.x, p.y, p.pressure]);
+  const outline = getStroke(pts, {
+    size: s.width,
+    thinning: 0.3,
+    smoothing: 0.3,
+    streamline: 0.2,
+    simulatePressure: true,
+  });
+
+  if (outline.length > 0) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', outlineToPath(outline));
+    path.setAttribute('fill', s.color);
+    layer.appendChild(path);
+  }
+
+  // 发送给服务器（canonical 坐标，所见即所得，与方向/缩放无关）
+  const rect = svg.getBoundingClientRect();
+  const k = canonicalScale(rect);
+  const msg = {
+    action: 'stroke',
+    points: s.points.map(p => {
+      const c = screenToCanonical(p.sx, p.sy, rect);
+      return { x: Math.round(c.x), y: Math.round(c.y) };
+    }),
+    color: s.color,
+    width: Math.max(1, Math.min(80, Math.round(s.width * k))),
+    eraser: s.eraser,
+  };
+  sendStroke(msg);
+
+  state.currentStroke = null;
+}
+
+function outlineToPath(outline) {
+  const [first, ...rest] = outline;
+  let d = `M ${first[0].toFixed(1)} ${first[1].toFixed(1)}`;
+  for (let i = 1; i < outline.length; i++) {
+    const prev = outline[i - 1];
+    const cur = outline[i];
+    const mx = (prev[0] + cur[0]) / 2;
+    const my = (prev[1] + cur[1]) / 2;
+    d += ` Q ${prev[0].toFixed(1)} ${prev[1].toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`;
+  }
+  const last = outline[outline.length - 1];
+  d += ` L ${last[0].toFixed(1)} ${last[1].toFixed(1)} Z`;
+  return d;
+}
+
+// ── 双指缩放 / 平移 ──
+let pinchState = null;
+
+canvasArea.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    if (activePointerId != null) {
+      try { svg.releasePointerCapture(activePointerId); } catch (_) {}
+      activePointerId = null;
+      state.currentStroke = null;
+    }
+    const mid = fingerMid(e.touches);
+    pinchState = {
+      dist: fingerDist(e.touches),
+      midX: mid.x, midY: mid.y,
+      scale: state.zoom.scale,
+      ox: state.zoom.ox,
+      oy: state.zoom.oy,
+    };
+  }
+}, { passive: false });
+
+canvasArea.addEventListener('touchmove', (e) => {
+  if (!pinchState || e.touches.length !== 2) return;
+  e.preventDefault();
+
+  const newDist = fingerDist(e.touches);
+  const ratio = newDist / pinchState.dist;
+  const newScale = Math.min(5, Math.max(0.3, pinchState.scale * ratio));
+
+  const mx = pinchState.midX;
+  const my = pinchState.midY;
+  state.zoom.ox = mx - (mx - pinchState.ox) * newScale / pinchState.scale;
+  state.zoom.oy = my - (my - pinchState.oy) * newScale / pinchState.scale;
+  state.zoom.scale = newScale;
+  applyZoom();
+}, { passive: false });
+
+canvasArea.addEventListener('touchend', (e) => {
+  if (e.touches.length < 2) pinchState = null;
+});
+
+function fingerDist(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function fingerMid(touches) {
+  const rect = svg.getBoundingClientRect();
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2 - rect.left,
+    y: (touches[0].clientY + touches[1].clientY) / 2 - rect.top,
+  };
+}
+
+// ── 启动 ──
+updateQueueBadge(loadQueue().length);
+connectWS();
+
+// ── 会话操作：保存当前会话为 Excalidraw 文件 / 开启新会话 ──
+const sessionBtn = document.getElementById('session-btn');
+const newSessionBtn = document.getElementById('newsession-btn');
+
+function daemonBase() {
+  const port = PASSPAPER_PORT.startsWith('__') ? '8765' : PASSPAPER_PORT;
+  return `http://${location.hostname}:${port}`;
+}
+function daemonToken() {
+  const t = PASSPAPER_TOKEN.startsWith('__') ? null : PASSPAPER_TOKEN;
+  return t || '';
+}
+function ppDownload(name, content, type) {
+  const blob = new Blob([content], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function ppExtractCode(text) {
+  const m = text.match(/```\n([\s\S]*?)```/);
+  return m ? m[1] : text;
+}
+async function ppExportSession() {
+  const token = daemonToken();
+  const args = encodeURIComponent(JSON.stringify({ format: 'excalidraw' }));
+  const url = daemonBase() + `/mcp/call?name=export_session&args=${args}`
+            + (token ? `&token=${token}` : '');
+  try {
+    const r = await fetch(url);
+    const j = await r.json();
+    const text = (j.content && j.content[0] && j.content[0].text) || '';
+    ppDownload(`passpaper-${Date.now()}.excalidraw`, ppExtractCode(text), 'application/json');
+  } catch (e) { /* 静默失败，不干扰书写体验 */ }
+}
+sessionBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  ppExportSession();
+});
+newSessionBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  const token = daemonToken();
+  fetch(daemonBase() + `/mcp/call?name=start_session` + (token ? `&token=${token}` : ''))
+    .catch(() => {});
+});
+</script>
+</body>
+</html>

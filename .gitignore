@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Runtime data (regenerated)
+src/data/*.png
+PASSPAPER_URL.txt
+*.png
+!docs/*.png
+
+# Virtual env
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# WorkBuddy (project-specific memory, not for repo)
+.workbuddy/
+
+# Local MCP config with hardcoded user paths (provide mcp.example.json instead)
+.mcp.json
+
+# Internal v2/v3 tech docs & work deliverables (not for public repo)
+PASSPAPER_TECH_OVERVIEW.txt
+deliverables/
+
+# Internal project handoff doc (contains personal paths / v3 notes; not for public repo)
+HANDBOOK.md
+
+# Local runtime URL (contains LAN IP)
+PASSPAPER_URL.txt
+
+# Test scratch dir (created by tests/test_recorder_recognition.py)
+.test_tmp_sessions/
+
+# Local sessions dir (runtime; regenerated) — keep out of source control
+sessions/
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.sqlite
+*.sqlite3
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.zip
+
+# Logs
+*.log
+
+# Node (not used today, but keep clean)
+node_modules/
+
+# Internal-only docs & records (not for the public repo)
+CLAUDE.md
+PROJECT_STATUS.md
+WORKLOG.md
+docs/STATUS_REVIEW_*.md
+docs/COMPETITIVE_ANALYSIS.md
+docs/TEST_SOP_*.md
+docs/agent-memory-archive/
+docs/RELEASE_AUDIT_*.md
+
+# Legacy/dead script (replaced by `passpaper setup`)
+scripts/setup_global_mcp.py
+
+# Internal process files (not for public repo)
+给下一个agent的prompt_*.txt
+
+# Archive / build artifacts in root
+*.zip
