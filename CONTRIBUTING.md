@@ -26,7 +26,7 @@ work lives in the daemon.
 ## Dev setup
 
 ```bash
-git clone https://github.com/passpaper-community/passpaper.git
+git clone https://github.com/Bin-H-17/passpaper.git
 cd passpaper
 python -m venv .venv && source .venv/bin/activate   # or: .venv\Scripts\activate
 pip install -e ".[dev]"                             # installs deps + the CLI

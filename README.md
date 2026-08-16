@@ -1,5 +1,7 @@
 # 递纸 PassPaper
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/bin-h-17-passpaper-111bju)](https://m8ven.ai/mcp/bin-h-17-passpaper-111bju)
+
 [中文](#中文) | [English](#english)
 
 ---
@@ -78,6 +80,8 @@ python src/passpaper/cli.py rotate-token  # 配对码泄露时轮换
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — daemon + shim 双层架构、数据流、延迟与鉴权细节
 - [docs/RECOGNITION.md](docs/RECOGNITION.md) — 本地中文/公式识别端点配置 + 推荐模型组合
 - [docs/ACCEPTANCE_TEST_PLAN.md](docs/ACCEPTANCE_TEST_PLAN.md) — 真机验收清单
+- [PRIVACY.md](PRIVACY.md) — 隐私政策：本地优先，无云、无遥测、无出站调用
+- [SECURITY.md](SECURITY.md) — 安全模型：配对令牌、识别端点风险说明、漏洞报告
 
 ### 依赖
 
@@ -211,6 +215,8 @@ Optional autostart at boot: `python src/passpaper/cli.py setup --autostart`
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — daemon + shim architecture, data flow, latency and auth details
 - [docs/RECOGNITION.md](docs/RECOGNITION.md) — local Chinese / formula recognition endpoint configuration + recommended model combinations
 - [docs/ACCEPTANCE_TEST_PLAN.md](docs/ACCEPTANCE_TEST_PLAN.md) — real-device acceptance checklist
+- [PRIVACY.md](PRIVACY.md) — privacy policy: local-first, no cloud, no telemetry, no outbound calls
+- [SECURITY.md](SECURITY.md) — security model: pairing token, recognition endpoint risk, vulnerability reporting
 
 ### Dependencies
 

@@ -53,4 +53,4 @@ All notable changes to PassPaper are documented here. The format is based on
 - Design influences are credited per-item in [REFERENCES.md](REFERENCES.md)
   (MIT project; legal-prudent attribution of AGPL-3.0 upstreams).
 
-[1.0.0]: https://github.com/passpaper-community/passpaper/releases/tag/v1.0.0
+[1.0.0]: https://github.com/Bin-H-17/passpaper/releases/tag/v1.0.0

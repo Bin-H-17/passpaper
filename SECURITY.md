@@ -37,7 +37,7 @@ any recognition service and simply lets the AI agent read the image directly.
 Please **do not** open a public GitHub issue for security problems.
 
 Instead, report privately via GitHub's
-[private vulnerability reporting](https://github.com/passpaper-community/passpaper/security/advisories/new)
+[private vulnerability reporting](https://github.com/Bin-H-17/passpaper/security/advisories/new)
 or email the maintainer (see the maintainer section in README). You will receive
 an acknowledgement within a few days, and we will coordinate a fix and disclosure
 timeline with you.

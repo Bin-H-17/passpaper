@@ -31,8 +31,8 @@ passpaper-daemon = "passpaper.daemon:main"
 passpaper-mcp = "passpaper.mcp_shim:main"
 
 [project.urls]
-Homepage = "https://github.com/passpaper-community/passpaper"
-Repository = "https://github.com/passpaper-community/passpaper"
+Homepage = "https://github.com/Bin-H-17/passpaper"
+Repository = "https://github.com/Bin-H-17/passpaper"
 
 [tool.setuptools.packages.find]
 where = ["src"]
