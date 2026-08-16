@@ -1,6 +1,13 @@
 # 递纸 PassPaper
 
+[![CI](https://github.com/Bin-H-17/passpaper/actions/workflows/ci.yml/badge.svg)](https://github.com/Bin-H-17/passpaper/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Bin-H-17/passpaper/badge)](https://securityscorecards.dev/viewer/?uri=github.com/Bin-H-17/passpaper)
 [![M8ven Score](https://m8ven.ai/badge/mcp/bin-h-17-passpaper-111bju)](https://m8ven.ai/mcp/bin-h-17-passpaper-111bju)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
+[![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=Bin-H-17_passpaper&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Bin-H-17_passpaper)
+[![codecov](https://codecov.io/gh/Bin-H-17/passpaper/branch/main/graph/badge.svg)](https://codecov.io/gh/Bin-H-17/passpaper)
 
 [中文](#中文) | [English](#english)
 
@@ -269,6 +276,11 @@ Issues and PRs welcome. Dev environment, tests and rules: see [CONTRIBUTING.md](
 ### References & inspiration
 
 PassPaper's design is inspired by several open-source projects, credited one by one in [REFERENCES.md](REFERENCES.md).
+
+
+### Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Bin-H-17/passpaper&type=Date)](https://star-history.com/#Bin-H-17/passpaper&Date)
 
 ### License
 
