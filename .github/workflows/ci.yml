@@ -29,11 +29,10 @@ jobs:
       - name: Run tests
         run: |
           python -m pytest tests/ -v --cov=passpaper --cov-report=xml --cov-report=term || python scripts/e2e_test.py
-      - name: Upload coverage
+      - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
           fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
