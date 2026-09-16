@@ -26,9 +26,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]" 2>/dev/null || pip install -e .
           pip install pytest pytest-cov
-      - name: Run tests
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
         run: |
-          python -m pytest tests/ -v --cov=passpaper --cov-report=xml --cov-report=term || python scripts/e2e_test.py
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          pip install pytest pytest-cov
+      - name: Run tests
+        timeout-minutes: 8
+        run: |
+          # `timeout` is load-bearing: a hanging test must fail this step in minutes,
+          # not sit until the 6-hour job limit and produce a bogus "failure" mail.
+          # The old command ended with `|| python scripts/e2e_test.py`, but that script
+          # is a Windows-only desktop harness (taskkill, local daemon on 127.0.0.1:8765);
+          # on a Linux runner it blocks forever, which is what made every run hang.
+          timeout --signal=KILL 300 python -m pytest tests/ -v --cov=passpaper --cov-report=xml --cov-report=term
+          rc=$?
+          if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+            echo "::error::pytest exceeded 300s (hang) - see log above"
+          fi
+          exit $rc
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
