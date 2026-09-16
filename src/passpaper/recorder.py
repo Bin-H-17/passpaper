@@ -47,16 +47,30 @@ class SessionRecorder:
             self.sessions_dir.mkdir(parents=True, exist_ok=True)
         except Exception:
             pass
-        self._lock = threading.Lock()
+        # RLock, not Lock: start_new_session() holds the lock while calling
+        # _open_current() -> _append(), which re-acquires it. A plain Lock()
+        # self-deadlocks there (this hung every CI run for the full 6h job
+        # timeout, and would freeze the daemon on every new session).
+        self._lock = threading.RLock()
         self.current_id = self._new_id()
         self._open_current()
 
     # ── session lifecycle ──
-    @staticmethod
-    def _new_id() -> str:
-        # Local, human-readable, sortable. Collisions across a single machine
-        # within the same second are astronomically unlikely for handwriting.
-        return datetime.now().strftime("%Y%m%d-%H%M%S")
+    def _new_id(self) -> str:
+        """Local, human-readable, sortable session id — guaranteed unique on disk.
+
+        A bare second-resolution timestamp is NOT unique: a session started in the
+        same wall-clock second as the previous one reused that id, so the "new"
+        session silently appended into the previous session's file (the isolation
+        test caught this). Suffix -1, -2, ... until the filename is free.
+        """
+        base = datetime.now().strftime("%Y%m%d-%H%M%S")
+        cand = base
+        n = 1
+        while (self.sessions_dir / f"{cand}.jsonl").exists():
+            cand = f"{base}-{n}"
+            n += 1
+        return cand
 
     def _current_path(self) -> Path:
         return self.sessions_dir / f"{self.current_id}.jsonl"
