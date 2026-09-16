@@ -24,7 +24,7 @@ jobs:
             echo "have=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.sonar_token.outputs.have == 'true'
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
