@@ -15,7 +15,7 @@
 
 ### mcp_excalidraw — https://github.com/yctimlin/mcp_excalidraw （MIT）
 - **借鉴**：`常驻 daemon + 薄驱动层（shim）` 的拆分层；`describe`（结构化文本）+ `screenshot`（渲染图）双通道，让 agent「看见并修正」自己产出的图；CLI 优先、零 API Key 的本地运行形态。
-- **我们的差异**：把这套「daemon + 极薄 stdio shim」用于**人类手写输入**而非程序化绘图；取图采用**笔画到达即增量渲染**（实测 ~25ms）而非整图截图；shim 纯标准库、握手 <100ms。
+- **与上游的差异**：把这套「daemon + 薄 stdio shim」用于**人类手写输入**而非程序化绘图；取图采用**笔画到达即增量渲染**（实测 ~25ms）而非整图截图；shim 纯标准库、握手 <100ms。
 
 ### Weylus — https://github.com/H-M-H/Weylus （AGPL-3.0）
 - **借鉴**：`二维码 / 书签零安装配对` 的 UX 范式——平板用浏览器即可，无需安装 App；以及「旧平板当第二屏 / 手绘板」的设备复用思路。
@@ -43,7 +43,7 @@
 
 ## 四、中文手写 / OCR 候选模型（未使用，仅作 POC 参考）
 
-- **PaddleOCR** （Apache-2.0）/ **GLM-OCR** （Apache-2.0）：作为递纸「中文潦草 / 公式手写识别护城河」的候选本地模型参考，**非运行时依赖**。
+- **PaddleOCR** （Apache-2.0）/ **GLM-OCR** （Apache-2.0）：作为递纸「中文潦草 / 公式手写识别」的候选本地模型参考，**非运行时依赖**。
 
 ---
 

@@ -15,22 +15,22 @@
                                                      │ 配对令牌鉴权
                                                      ├──HTTP /snapshot /image /mcp/call
                                                      ▼
-                                            [mcp_shim.py 极薄 stdio]
+                                            [mcp_shim.py 薄 stdio]
                                                      │ 标准 MCP（握手 <100ms）
                                                      ▼
                                          [Claude Code / Codex CLI]
 ```
 
-**核心思想**：平板落笔 → 常驻 daemon 把笔画存进内存画布并可选录制成会话 → AI 客户端通过极薄 MCP shim 拉取最新手写（图 / 文本 / LaTeX）。AI 是**主动来读**，不是用户拍照推送。
+**核心思想**：平板落笔 → 常驻 daemon 把笔画存进内存画布并可选录制成会话 → AI 客户端通过薄 MCP shim 拉取最新手写（图 / 文本 / LaTeX）。AI 是**主动来读**，不是用户拍照推送。
 
 ---
 
-## 2. 为什么是「daemon + 极薄 shim」双层（v4 相对 v2/v3 的关键演进）
+## 2. 为什么是「daemon + 薄 shim」双层（v4 相对 v2/v3 的关键演进）
 
 - **v2（懒渲染）**：`bridge.py`（WS+HTTP）直接被 MCP server 调。简单，但 MCP server 与桥耦合、跨客户端（Codex）要重写。
 - **v4**：拆成
   - **daemon.py**：唯一常驻进程。持有内存画布、会话录制、配对鉴权、HTTP 接口。不依赖任何 AI 客户端。
-  - **mcp_shim.py**：极薄 stdio 进程。只把 MCP 协议翻译成对 daemon 的 HTTP 调用（标准库实现，握手 <100ms）。**同一份 shim 同时支持 Claude Code 与 Codex**（两者 2026 起均支持 MCP）。
+  - **mcp_shim.py**：薄 stdio 进程。只把 MCP 协议翻译成对 daemon 的 HTTP 调用（标准库实现，握手 <100ms）。**同一份 shim 同时支持 Claude Code 与 Codex**（两者 2026 起均支持 MCP）。
 
 借鉴署名见 `REFERENCES.md`（mcp_excalidraw 的同款 daemon+shim 拆分层）。
 
@@ -41,7 +41,7 @@
 | 模块 | 职责 |
 |------|------|
 | `daemon.py` | 常驻服务。WebSocket 收笔画（`stroke`/`batch`/`clear`）、内存画布、HTTP `/snapshot`(PNG) `/image` `/mcp/call`、配对令牌鉴权、断线缓存+重连批量补发。 |
-| `mcp_shim.py` | 极薄 stdio MCP server。`TOOLS` 暴露 9 个工具，收到调用后走 HTTP 到 daemon。 |
+| `mcp_shim.py` | 薄 stdio MCP server。`TOOLS` 暴露 9 个工具，收到调用后走 HTTP 到 daemon。 |
 | `canvas.html` | 平板端单文件网页。Pointer Events + 自研增量渲染；「保存会话 / 新建会话」按钮；存书签即开即用，零安装。 |
 | `recorder.py` | `SessionRecorder`：每笔落盘 `DATA_DIR/sessions/<id>.jsonl`；`list_sessions / start_new_session / strokes_of / export(md|jsonl|json|excalidraw)`。增量、可 git、可回放。 |
 | `recognition.py` | 可插拔识别：`get_recognizer()`→`LocalVLMRecognizer`(OpenAI 兼容 `/chat/completions`) 或回退 `AgentVisionFallback`。输出 `text / latex / confidence / engine / note`。未配端点时**优雅回退**到「Agent 直接看图」。 |
